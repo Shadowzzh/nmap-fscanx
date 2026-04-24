@@ -13,6 +13,18 @@ tar -xzf nmap-fscanx-0.1.0.tar.gz
 cd nmap-fscanx-0.1.0
 make install
 nmap-fscanx check
+nmap-fscanx phase1 --targets '192.168.1.0/24,192.168.20.0/24' --scan-root './scans/onsite-20260424'
+cat ./scans/onsite-20260424/phase1/alive_ips.txt
+jq '.' ./scans/onsite-20260424/phase1/phase1.summary.json
+nmap-fscanx phase2 --scan-root './scans/onsite-20260424'
+```
+
+现场推荐顺序是先跑第一阶段，先看结果，再跑第二阶段。
+第二阶段必须复用同一个 `--scan-root`，因为它读取的是 `phase1/alive_ips.txt`。
+
+如果你确认不需要人工停顿，也可以直接用便捷模式：
+
+```bash
 nmap-fscanx start --targets '192.168.1.0/24,192.168.20.0/24'
 ```
 
@@ -30,7 +42,7 @@ nmap-fscanx start --targets '192.168.1.0/24,192.168.20.0/24'
 make install SCANNER=/path/to/fscanx
 ```
 
-进入后台会话：
+如果你用了 `start`，进入后台会话：
 
 ```bash
 nmap-fscanx attach --session nmap-fscanx-scan-20260424

@@ -150,7 +150,8 @@ run_pipeline_command() {
   nmap_fscanx_require_command jq
   build_pipeline_args "$scanner_path"
 
-  "$INSTALL_ROOT/libexec/fscanx_pipeline.sh" "$subcommand" "${PIPELINE_ARGS[@]}"
+  NMAP_FSCANX_DISPLAY_COMMAND="$COMMAND" \
+    "$INSTALL_ROOT/libexec/fscanx_pipeline.sh" "$subcommand" "${PIPELINE_ARGS[@]}"
 }
 
 print_check_status() {
@@ -264,6 +265,8 @@ run_start() {
   echo "ATTACH_COMMAND=tmux attach -t $session_name"
   echo "SCAN_ROOT=$scan_root"
   echo "FINAL_REPORT=$scan_root/report.json"
+  echo "TAIL_PHASE1_LOG=tail -f $scan_root/phase1/console.log"
+  echo "TAIL_PHASE2_LOG=tail -f $scan_root/phase2/console.log"
 }
 
 run_attach() {

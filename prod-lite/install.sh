@@ -260,12 +260,43 @@ write_runtime_config() {
   fi
 
   {
-    echo "# Runtime config for nmap-fscanx"
+    echo "# nmap-fscanx 运行配置"
+    echo "#"
+    echo "# 说明："
+    echo "# 1. 这里的配置会覆盖安装目录中的 conf/default.env。"
+    echo "# 2. 修改后重新执行 nmap-fscanx run/phase1/phase2/start 即可生效。"
+    echo "# 3. 可先执行 nmap-fscanx print-config 确认当前实际生效值。"
+    echo
+    echo "# 第一阶段扫描端口。"
+    echo "# 目标 IP 只要命中这些端口中的任意一个，就会进入第二阶段全端口扫描。"
+    echo "# NMAP_FSCANX_PHASE1_PORTS=22,80,443,445,3389"
+    echo
+    echo "# 第二阶段扫描端口范围。"
+    echo "# 默认对第一阶段命中的主机执行全端口扫描。"
+    echo "# NMAP_FSCANX_PHASE2_PORTS=1-65535"
+    echo
+    echo "# fscanx 并发数。"
+    echo "# 数值越大扫描越快，但也会增加本机和目标网络压力。"
+    echo "# NMAP_FSCANX_THREADS=4000"
+    echo
+    echo "# 单次端口探测超时时间，单位为秒。"
+    echo "# 内网延迟较低时可保持默认值，网络较慢时可适当调大。"
+    echo "# NMAP_FSCANX_TIMEOUT=1"
+    echo
+    echo "# tmux 会话名前缀。"
+    echo "# 使用 start 命令后台启动扫描时，会用这个前缀拼接会话名。"
+    echo "# NMAP_FSCANX_TMUX_PREFIX=nmap-fscanx"
+    echo
+    echo "# fscanx 可执行文件路径。"
+    echo "# 如果安装时没有自动识别到扫描器，可以在这里手动指定。"
     if [[ -n "$SCANNER_PATH" ]]; then
       printf 'NMAP_FSCANX_SCANNER=%q\n' "$SCANNER_PATH"
     else
       echo "# NMAP_FSCANX_SCANNER=/path/to/fscanx"
     fi
+    echo
+    echo "# 扫描结果根目录。"
+    echo "# 不设置时使用默认输出目录；设置后所有扫描结果会落到这里。"
     echo "# NMAP_FSCANX_SCAN_BASE=/path/to/scans"
   } > "$config_file"
 }

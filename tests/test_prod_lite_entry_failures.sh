@@ -177,6 +177,10 @@ if ! grep -Eq '^SESSION_NAME=nmap-fscanx-scan-[0-9]{8}-[0-9]{6}$' "$START_OUTPUT
 fi
 
 assert_contains "ATTACH_COMMAND=tmux attach -t" "$START_OUTPUT"
+assert_contains "SCAN_ROOT=$TMP_ROOT/scans/start" "$START_OUTPUT"
+assert_contains "FINAL_REPORT=$TMP_ROOT/scans/start/report.json" "$START_OUTPUT"
+assert_contains "TAIL_PHASE1_LOG=tail -f $TMP_ROOT/scans/start/phase1/console.log" "$START_OUTPUT"
+assert_contains "TAIL_PHASE2_LOG=tail -f $TMP_ROOT/scans/start/phase2/console.log" "$START_OUTPUT"
 assert_contains "has-session -t nmap-fscanx-scan-" "$START_TMUX_LOG"
 assert_contains "new -ds nmap-fscanx-scan-" "$START_TMUX_LOG"
 

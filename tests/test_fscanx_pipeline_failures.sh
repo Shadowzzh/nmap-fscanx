@@ -58,6 +58,14 @@ for ((i = 0; i < ${#args[@]}; i++)); do
   esac
 done
 
+if [[ "$mode" == "phase1" ]]; then
+  printf '%s\n' "[*] mock phase1 raw output (${scenario})"
+fi
+
+if [[ "$mode" == "phase2" ]]; then
+  printf '%s\n' "[*] mock phase2 raw output (${scenario})"
+fi
+
 case "$scenario:$mode" in
   empty_phase1:phase1)
     cat > result.txt <<'JSON'
@@ -134,6 +142,16 @@ MOCK_SCENARIO="empty_phase1" \
     --targets "192.168.1.0/24,192.168.20.0/24" \
     --scan-root "$EMPTY_SCAN_ROOT" \
     > "$TMP_ROOT/empty-phase1.stdout"
+
+assert_contains "COMMAND=all" "$TMP_ROOT/empty-phase1.stdout"
+assert_contains "PHASE_START=phase1" "$TMP_ROOT/empty-phase1.stdout"
+assert_contains "[*] mock phase1 raw output (empty_phase1)" "$TMP_ROOT/empty-phase1.stdout"
+assert_contains "PHASE_DONE=phase1" "$TMP_ROOT/empty-phase1.stdout"
+assert_contains "PHASE_START=phase2" "$TMP_ROOT/empty-phase1.stdout"
+assert_contains "PHASE_INPUT_FILE=$EMPTY_SCAN_ROOT/phase1/alive_ips.txt" "$TMP_ROOT/empty-phase1.stdout"
+assert_contains "phase1 没有存活 IP，跳过 phase2 扫描" "$TMP_ROOT/empty-phase1.stdout"
+assert_contains "PHASE_DONE=phase2" "$TMP_ROOT/empty-phase1.stdout"
+assert_contains "FINAL_REPORT=$EMPTY_SCAN_ROOT/report.json" "$TMP_ROOT/empty-phase1.stdout"
 
 if [[ ! -f "$EMPTY_SCAN_ROOT/report.json" ]]; then
   echo "empty phase1 should still produce report.json" >&2
@@ -253,6 +271,15 @@ bash "$SCRIPT_PATH" phase2 \
   --scan-root "$RERUN_SCAN_ROOT" \
   > "$TMP_ROOT/rerun-phase2.stdout"
 
+assert_contains "COMMAND=phase2" "$TMP_ROOT/rerun-phase2.stdout"
+assert_contains "TARGETS=192.168.30.0/24,192.168.40.0/24" "$TMP_ROOT/rerun-phase2.stdout"
+assert_contains "PHASE_START=phase2" "$TMP_ROOT/rerun-phase2.stdout"
+assert_contains "PHASE_INPUT_FILE=$RERUN_SCAN_ROOT/phase1/alive_ips.txt" "$TMP_ROOT/rerun-phase2.stdout"
+assert_contains "[*] mock phase2 raw output (default)" "$TMP_ROOT/rerun-phase2.stdout"
+assert_contains "PHASE_DONE=phase2" "$TMP_ROOT/rerun-phase2.stdout"
+assert_contains "PHASE2_SUMMARY=$RERUN_SCAN_ROOT/phase2/phase2.summary.json" "$TMP_ROOT/rerun-phase2.stdout"
+assert_contains "FINAL_REPORT=$RERUN_SCAN_ROOT/report.json" "$TMP_ROOT/rerun-phase2.stdout"
+
 resolved_targets="$(jq -cr '.targets' "$RERUN_SCAN_ROOT/report.json")"
 if [[ "$resolved_targets" != '["192.168.30.0/24","192.168.40.0/24"]' ]]; then
   echo "phase2 rerun should preserve targets from input.json" >&2
@@ -283,6 +310,12 @@ bash "$SCRIPT_PATH" phase1 \
   --targets "192.168.9.0/24,192.168.4.0/24" \
   --scan-root "$STALE_REPORT_SCAN_ROOT" \
   > "$TMP_ROOT/stale-report-phase1.stdout"
+
+assert_contains "COMMAND=phase1" "$TMP_ROOT/stale-report-phase1.stdout"
+assert_contains "TARGETS=192.168.9.0/24,192.168.4.0/24" "$TMP_ROOT/stale-report-phase1.stdout"
+assert_contains "PHASE_START=phase1" "$TMP_ROOT/stale-report-phase1.stdout"
+assert_contains "[*] mock phase1 raw output (default)" "$TMP_ROOT/stale-report-phase1.stdout"
+assert_contains "PHASE_DONE=phase1" "$TMP_ROOT/stale-report-phase1.stdout"
 
 phase1_targets_after_rerun="$(jq -cr '.targets' "$STALE_REPORT_SCAN_ROOT/phase1/phase1.summary.json")"
 if [[ "$phase1_targets_after_rerun" != '["192.168.9.0/24","192.168.4.0/24"]' ]]; then

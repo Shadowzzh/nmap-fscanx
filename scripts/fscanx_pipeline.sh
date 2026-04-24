@@ -13,6 +13,10 @@ THREADS="4000"
 TIMEOUT_SECONDS="1"
 SCAN_ROOT=""
 
+display_command() {
+  printf '%s\n' "${NMAP_FSCANX_DISPLAY_COMMAND:-$COMMAND}"
+}
+
 print_help() {
   cat <<'EOF'
 用法：
@@ -151,6 +155,37 @@ preview_lines() {
   head -n "$limit" "$file" | paste -sd ',' -
 }
 
+print_command_header() {
+  echo "COMMAND=$(display_command)"
+  echo "SCAN_ROOT=$SCAN_ROOT"
+  echo "SCANNER=$SCANNER"
+
+  if [[ -n "$TARGETS" ]]; then
+    echo "TARGETS=$TARGETS"
+  fi
+}
+
+print_phase_start() {
+  local phase_name="$1"
+  local console_log="$2"
+  local result_file="$3"
+  local input_file="${4:-}"
+
+  echo "PHASE_START=$phase_name"
+  echo "CONSOLE_LOG=$console_log"
+  echo "RESULT_FILE=$result_file"
+
+  if [[ -n "$input_file" ]]; then
+    echo "PHASE_INPUT_FILE=$input_file"
+  fi
+}
+
+print_phase_done() {
+  local phase_name="$1"
+
+  echo "PHASE_DONE=$phase_name"
+}
+
 normalize_result_file() {
   local raw_file="$1"
   local normalized_file="$2"
@@ -249,7 +284,7 @@ run_scanner_in_dir() {
 
   (
     cd "$workdir"
-    "$SCANNER" "$@" > console.log 2>&1
+    "$SCANNER" "$@" 2>&1 | tee console.log
   )
 
   if [[ ! -f "$workdir/result.txt" ]]; then
@@ -349,6 +384,18 @@ print_phase1_output() {
   fi
 }
 
+print_phase2_output() {
+  local summary_file="$1"
+  local assets_file="$2"
+  local asset_count=""
+
+  asset_count="$(count_lines "$assets_file")"
+
+  echo "PHASE2_SUMMARY=$summary_file"
+  echo "OPEN_IP_PORT_COUNT=$asset_count"
+  echo "OPEN_IP_PORT_FILE=$assets_file"
+}
+
 run_phase1() {
   local phase1_dir="$SCAN_ROOT/phase1"
   local normalized_file="$phase1_dir/normalized.json"
@@ -360,6 +407,7 @@ run_phase1() {
   fi
 
   clear_phase2_outputs
+  print_phase_start "phase1" "$phase1_dir/console.log" "$phase1_dir/result.txt"
   run_scanner_in_dir "$phase1_dir" \
     -h "$TARGETS" \
     -p "$PHASE1_PORTS" \
@@ -372,6 +420,8 @@ run_phase1() {
   normalize_result_file "$phase1_dir/result.txt" "$normalized_file"
   extract_alive_ips "$normalized_file" "$alive_file"
   write_phase1_summary "$summary_file" "$alive_file"
+  print_phase_done "phase1"
+  print_phase1_output "$summary_file" "$alive_file"
 }
 
 run_phase2() {
@@ -387,13 +437,16 @@ run_phase2() {
   fi
 
   mkdir -p "$phase2_dir"
+  print_phase_start "phase2" "$phase2_dir/console.log" "$phase2_dir/result.txt" "$alive_file"
 
   if [[ ! -s "$alive_file" ]]; then
     : > "$assets_file"
     printf '[]\n' > "$normalized_file"
-    printf 'phase1 没有存活 IP，跳过 phase2 扫描\n' > "$phase2_dir/console.log"
+    printf 'phase1 没有存活 IP，跳过 phase2 扫描\n' | tee "$phase2_dir/console.log"
     write_phase2_summary "$summary_file" "$assets_file"
     write_report "$phase1_dir/phase1.summary.json" "$summary_file" "$SCAN_ROOT/report.json"
+    print_phase_done "phase2"
+    print_phase2_output "$summary_file" "$assets_file"
     return 0
   fi
 
@@ -410,6 +463,8 @@ run_phase2() {
   extract_open_ip_ports "$normalized_file" "$assets_file"
   write_phase2_summary "$summary_file" "$assets_file"
   write_report "$phase1_dir/phase1.summary.json" "$summary_file" "$SCAN_ROOT/report.json"
+  print_phase_done "phase2"
+  print_phase2_output "$summary_file" "$assets_file"
 }
 
 parse_args() {
@@ -469,6 +524,7 @@ main() {
 
   resolve_targets_from_input "$SCAN_ROOT/input.json"
   write_input_json "$SCAN_ROOT/input.json" "$TARGETS"
+  print_command_header
 
   case "$COMMAND" in
     phase1)
@@ -487,12 +543,9 @@ main() {
   esac
 
   case "$COMMAND" in
-    phase1)
-      print_phase1_output "$SCAN_ROOT/phase1/phase1.summary.json" "$SCAN_ROOT/phase1/alive_ips.txt"
-      ;;
     phase2|all)
       if [[ -f "$SCAN_ROOT/report.json" ]]; then
-        echo "$SCAN_ROOT/report.json"
+        echo "FINAL_REPORT=$SCAN_ROOT/report.json"
       fi
       ;;
   esac

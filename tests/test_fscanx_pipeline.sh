@@ -12,6 +12,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
+assert_contains() {
+  local needle="$1"
+  local file="$2"
+
+  if ! grep -Fq "$needle" "$file"; then
+    echo "missing expected text: $needle" >&2
+    cat "$file" >&2
+    exit 1
+  fi
+}
+
 MOCK_BIN="$TMP_ROOT/bin"
 SCAN_ROOT="$TMP_ROOT/scans/fscanx-demo"
 mkdir -p "$MOCK_BIN"
@@ -55,6 +66,7 @@ if [[ "$mode" == "phase1" ]]; then
     exit 22
   fi
 
+  printf '%s\n' "[*] mock phase1 raw output"
   cat > result.txt <<'JSON'
 {"type":"msg","text":"phase1"},
 {"type":"Port","text":"open\t192.168.1.10:80\t\n"},
@@ -80,6 +92,7 @@ if [[ "$mode" == "phase2" ]]; then
     exit 25
   fi
 
+  printf '%s\n' "[*] mock phase2 raw output"
   cat > result.txt <<'JSON'
 {"type":"msg","text":"phase2"},
 {"type":"Port","text":"open\t192.168.1.10:80\t\n"},
@@ -124,6 +137,30 @@ bash "$SCRIPT_PATH" all \
   --scan-root "$SCAN_ROOT" \
   > "$TMP_ROOT/pipeline.stdout"
 
+assert_contains "COMMAND=all" "$TMP_ROOT/pipeline.stdout"
+assert_contains "SCAN_ROOT=$SCAN_ROOT" "$TMP_ROOT/pipeline.stdout"
+assert_contains "SCANNER=$MOCK_BIN/fscanx" "$TMP_ROOT/pipeline.stdout"
+assert_contains "TARGETS=192.168.1.0/24,192.168.20.0/24" "$TMP_ROOT/pipeline.stdout"
+assert_contains "PHASE_START=phase1" "$TMP_ROOT/pipeline.stdout"
+assert_contains "CONSOLE_LOG=$SCAN_ROOT/phase1/console.log" "$TMP_ROOT/pipeline.stdout"
+assert_contains "RESULT_FILE=$SCAN_ROOT/phase1/result.txt" "$TMP_ROOT/pipeline.stdout"
+assert_contains "[*] mock phase1 raw output" "$TMP_ROOT/pipeline.stdout"
+assert_contains "PHASE_DONE=phase1" "$TMP_ROOT/pipeline.stdout"
+assert_contains "PHASE1_SUMMARY=$SCAN_ROOT/phase1/phase1.summary.json" "$TMP_ROOT/pipeline.stdout"
+assert_contains "ALIVE_IP_COUNT=2" "$TMP_ROOT/pipeline.stdout"
+assert_contains "ALIVE_IP_FILE=$SCAN_ROOT/phase1/alive_ips.txt" "$TMP_ROOT/pipeline.stdout"
+assert_contains "ALIVE_IP_PREVIEW=192.168.1.10,192.168.20.15" "$TMP_ROOT/pipeline.stdout"
+assert_contains "PHASE_START=phase2" "$TMP_ROOT/pipeline.stdout"
+assert_contains "PHASE_INPUT_FILE=$SCAN_ROOT/phase1/alive_ips.txt" "$TMP_ROOT/pipeline.stdout"
+assert_contains "CONSOLE_LOG=$SCAN_ROOT/phase2/console.log" "$TMP_ROOT/pipeline.stdout"
+assert_contains "RESULT_FILE=$SCAN_ROOT/phase2/result.txt" "$TMP_ROOT/pipeline.stdout"
+assert_contains "[*] mock phase2 raw output" "$TMP_ROOT/pipeline.stdout"
+assert_contains "PHASE_DONE=phase2" "$TMP_ROOT/pipeline.stdout"
+assert_contains "PHASE2_SUMMARY=$SCAN_ROOT/phase2/phase2.summary.json" "$TMP_ROOT/pipeline.stdout"
+assert_contains "OPEN_IP_PORT_COUNT=4" "$TMP_ROOT/pipeline.stdout"
+assert_contains "OPEN_IP_PORT_FILE=$SCAN_ROOT/phase2/open_ip_port.txt" "$TMP_ROOT/pipeline.stdout"
+assert_contains "FINAL_REPORT=$SCAN_ROOT/report.json" "$TMP_ROOT/pipeline.stdout"
+
 if [[ ! -f "$SCAN_ROOT/phase1/alive_ips.txt" ]]; then
   echo "alive_ips.txt was not created" >&2
   exit 1
@@ -148,6 +185,9 @@ if ! grep -Fq -- "-hf ../phase1/alive_ips.txt" "$MOCK_CALLS_LOG"; then
   echo "phase2 should read phase1 alive_ips.txt via -hf" >&2
   exit 1
 fi
+
+assert_contains "[*] mock phase1 raw output" "$SCAN_ROOT/phase1/console.log"
+assert_contains "[*] mock phase2 raw output" "$SCAN_ROOT/phase2/console.log"
 
 if [[ ! -f "$SCAN_ROOT/report.json" ]]; then
   echo "report.json was not created" >&2
