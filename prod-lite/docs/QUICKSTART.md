@@ -25,7 +25,7 @@ nmap-fscanx print-config
 ```bash
 nmap-fscanx run \
   --targets '192.168.1.0/24,192.168.20.0/24' \
-  --scan-root "$HOME/.local/share/nmap-fscanx/scans/demo-all"
+  --scan-root "./scans/demo-all"
 ```
 
 适合：
@@ -39,7 +39,7 @@ nmap-fscanx run \
 ```bash
 nmap-fscanx phase1 \
   --targets '192.168.1.0/24,192.168.20.0/24' \
-  --scan-root "$HOME/.local/share/nmap-fscanx/scans/demo-phase1"
+  --scan-root "./scans/demo-phase1"
 ```
 
 适合：
@@ -58,7 +58,7 @@ nmap-fscanx phase1 \
 
 ```bash
 nmap-fscanx phase2 \
-  --scan-root "$HOME/.local/share/nmap-fscanx/scans/demo-all"
+  --scan-root "./scans/demo-all"
 ```
 
 前提是对应目录下已经存在 `phase1/alive_ips.txt`。
@@ -70,7 +70,7 @@ nmap-fscanx phase2 \
 ```bash
 nmap-fscanx start \
   --targets '192.168.1.0/24,192.168.20.0/24' \
-  --scan-root "$HOME/.local/share/nmap-fscanx/scans/demo-tmux"
+  --scan-root "./scans/demo-tmux"
 ```
 
 启动后会打印：

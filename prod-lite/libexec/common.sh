@@ -59,17 +59,15 @@ nmap_fscanx_load_config() {
 }
 
 nmap_fscanx_default_scan_base() {
+  local current_dir=""
+
   if [[ -n "${NMAP_FSCANX_SCAN_BASE:-}" ]]; then
     printf '%s\n' "$NMAP_FSCANX_SCAN_BASE"
     return 0
   fi
 
-  if nmap_fscanx_is_system_install; then
-    printf '/var/lib/nmap-fscanx/scans\n'
-    return 0
-  fi
-
-  printf '%s/.local/share/nmap-fscanx/scans\n' "$HOME"
+  current_dir="$(pwd -P)"
+  printf '%s/scans\n' "$current_dir"
 }
 
 nmap_fscanx_default_scan_root() {

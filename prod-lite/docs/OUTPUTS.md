@@ -2,8 +2,7 @@
 
 默认输出目录来自：
 
-- 用户级安装：`$HOME/.local/share/nmap-fscanx/scans`
-- 系统级安装：`/var/lib/nmap-fscanx/scans`
+- 当前执行目录下的 `./scans`
 
 如果命令行传了 `--scan-root`，就以命令行为准。
 
