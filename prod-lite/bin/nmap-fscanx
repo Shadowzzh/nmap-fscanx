@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SCRIPT_PATH" ]]; do
+  SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+  SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+  if [[ "$SCRIPT_PATH" != /* ]]; then
+    SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+  fi
+done
+
+BIN_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+INSTALL_ROOT="$(cd "$BIN_DIR/.." && pwd)"
+
+exec "$INSTALL_ROOT/libexec/nmap-fscanx-entry.sh" "$@"
