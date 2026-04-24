@@ -40,6 +40,8 @@
 第一阶段提取出的唯一 IP 列表。  
 它不是“全网所有在线 IP”，而是“命中第一阶段重点端口的 IP”。
 
+单独执行 `phase1` 时，优先看这个文件和 `phase1/phase1.summary.json`。
+
 ### `phase2/open_ip_port.txt`
 
 第二阶段提取出的唯一 `IP:PORT` 列表。
@@ -47,7 +49,8 @@
 ### `report.json`
 
 最终汇总报告。  
-如果只需要看最终统计，优先看这个文件。
+如果只需要看最终统计，优先看这个文件。  
+它只在执行完整流程或执行 `phase2` 后可靠；单独重跑 `phase1` 时，旧的 `report.json` 会被清理，避免误读旧结果。
 
 ## 3. 常见查看方式
 
@@ -55,6 +58,12 @@
 
 ```bash
 cat <scan-root>/phase1/alive_ips.txt
+```
+
+看第一阶段摘要：
+
+```bash
+jq '.' <scan-root>/phase1/phase1.summary.json
 ```
 
 看第二阶段扫出的资产：
@@ -87,5 +96,6 @@ jq '.phase1.alive_ip_count, .phase2.open_ip_port_count' <scan-root>/report.json
 如果只是想确认最终结果，优先看：
 
 - `phase1/alive_ips.txt`
+- `phase1/phase1.summary.json`
 - `phase2/open_ip_port.txt`
 - `report.json`

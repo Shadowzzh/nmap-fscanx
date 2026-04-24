@@ -2,7 +2,8 @@
 
 set -euo pipefail
 
-REPO_ROOT="/Users/zhangziheng/Documents/code/nmap"
+SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUILD_SCRIPT="$REPO_ROOT/scripts/build_prod_lite.sh"
 VERSION="0.1.0-test"
 ARCHIVE="$REPO_ROOT/dist/nmap-fscanx-$VERSION.tar.gz"

@@ -47,6 +47,13 @@ nmap-fscanx phase1 \
 - 只想快速筛一轮重点端口主机
 - 准备后续单独重跑第二阶段
 
+命令结束后会打印：
+
+- `PHASE1_SUMMARY`
+- `ALIVE_IP_COUNT`
+- `ALIVE_IP_FILE`
+- `ALIVE_IP_PREVIEW`
+
 ## 5. 只跑第二阶段
 
 ```bash
@@ -55,6 +62,8 @@ nmap-fscanx phase2 \
 ```
 
 前提是对应目录下已经存在 `phase1/alive_ips.txt`。
+
+命令结束后会打印最终 `report.json` 路径。
 
 ## 6. 后台启动 tmux 会话
 

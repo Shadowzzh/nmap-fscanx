@@ -138,6 +138,19 @@ text_file_to_json_array() {
   jq -Rsc 'split("\n") | map(select(length > 0))' "$file"
 }
 
+count_lines() {
+  local file="$1"
+
+  awk 'END { print NR }' "$file"
+}
+
+preview_lines() {
+  local file="$1"
+  local limit="${2:-20}"
+
+  head -n "$limit" "$file" | paste -sd ',' -
+}
+
 normalize_result_file() {
   local raw_file="$1"
   local normalized_file="$2"
@@ -313,6 +326,29 @@ write_report() {
     }' > "$report_file"
 }
 
+clear_phase2_outputs() {
+  rm -rf "$SCAN_ROOT/phase2"
+  rm -f "$SCAN_ROOT/report.json"
+}
+
+print_phase1_output() {
+  local summary_file="$1"
+  local alive_file="$2"
+  local alive_count=""
+  local alive_preview=""
+
+  alive_count="$(count_lines "$alive_file")"
+  alive_preview="$(preview_lines "$alive_file")"
+
+  echo "PHASE1_SUMMARY=$summary_file"
+  echo "ALIVE_IP_COUNT=$alive_count"
+  echo "ALIVE_IP_FILE=$alive_file"
+
+  if [[ -n "$alive_preview" ]]; then
+    echo "ALIVE_IP_PREVIEW=$alive_preview"
+  fi
+}
+
 run_phase1() {
   local phase1_dir="$SCAN_ROOT/phase1"
   local normalized_file="$phase1_dir/normalized.json"
@@ -323,6 +359,7 @@ run_phase1() {
     fail "phase1 和 all 必须提供 --targets"
   fi
 
+  clear_phase2_outputs
   run_scanner_in_dir "$phase1_dir" \
     -h "$TARGETS" \
     -p "$PHASE1_PORTS" \
@@ -449,9 +486,16 @@ main() {
       ;;
   esac
 
-  if [[ -f "$SCAN_ROOT/report.json" ]]; then
-    echo "$SCAN_ROOT/report.json"
-  fi
+  case "$COMMAND" in
+    phase1)
+      print_phase1_output "$SCAN_ROOT/phase1/phase1.summary.json" "$SCAN_ROOT/phase1/alive_ips.txt"
+      ;;
+    phase2|all)
+      if [[ -f "$SCAN_ROOT/report.json" ]]; then
+        echo "$SCAN_ROOT/report.json"
+      fi
+      ;;
+  esac
 }
 
 main "$@"
