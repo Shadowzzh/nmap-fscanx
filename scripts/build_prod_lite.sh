@@ -2,7 +2,8 @@
 
 set -euo pipefail
 
-REPO_ROOT="/Users/zhangziheng/Documents/code/nmap"
+SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PACKAGE_SOURCE="$REPO_ROOT/prod-lite"
 DIST_DIR="$REPO_ROOT/dist"
 BUNDLE_SOURCE="${FSCANX_BUNDLE_SOURCE:-$REPO_ROOT/fscanx-bundle}"
