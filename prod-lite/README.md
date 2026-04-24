@@ -155,7 +155,7 @@ nmap-fscanx start --targets '192.168.1.0/24,192.168.20.0/24'
 nmap-fscanx attach --session nmap-fscanx-scan-20260424
 ```
 
-更多示例见 [docs/QUICKSTART.md](docs/QUICKSTART.md) 和 [examples/](examples/)。
+更多示例见 [docs/QUICKSTART.md](docs/QUICKSTART.md)、[docs/fscanx详细使用手册.md](docs/fscanx详细使用手册.md) 和 [examples/](examples/)。
 
 ## 输出结果
 
@@ -166,6 +166,8 @@ nmap-fscanx attach --session nmap-fscanx-scan-20260424
 - `report.json`
 
 详细说明见 [docs/OUTPUTS.md](docs/OUTPUTS.md)。
+
+如果你关心字段能力边界，例如 `OS`、`应用服务`、`版本`、`是否在线` 到底是否属于当前最终交付范围，见 [docs/fscanx字段支持情况说明.md](docs/fscanx字段支持情况说明.md)。
 
 ## 卸载
 
