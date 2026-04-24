@@ -66,7 +66,7 @@ sudo bash install.sh --system --scanner /path/to/fscanx
 bash install.sh --install-deps --scanner /path/to/fscanx
 ```
 
-更多安装细节见 [docs/INSTALL.md](docs/INSTALL.md)。
+更多安装细节见 [docs/安装.md](docs/安装.md)。
 
 ## 常用配置
 
@@ -152,10 +152,12 @@ nmap-fscanx start --targets '192.168.1.0/24,192.168.20.0/24'
 进入后台会话：
 
 ```bash
-nmap-fscanx attach --session nmap-fscanx-scan-20260424
+nmap-fscanx attach --session '<SESSION_NAME>'
 ```
 
-更多示例见 [docs/QUICKSTART.md](docs/QUICKSTART.md)、[docs/fscanx详细使用手册.md](docs/fscanx详细使用手册.md) 和 [examples/](examples/)。
+也可以直接执行 `start` 输出里的 `ATTACH_COMMAND`。
+
+更多示例见 [docs/快速开始.md](docs/快速开始.md)、[docs/核心命令.md](docs/核心命令.md)、[docs/fscanx详细使用手册.md](docs/fscanx详细使用手册.md) 和 [examples/](examples/)。
 
 ## 输出结果
 
@@ -165,7 +167,7 @@ nmap-fscanx attach --session nmap-fscanx-scan-20260424
 - `phase2/open_ip_port.txt`
 - `report.json`
 
-详细说明见 [docs/OUTPUTS.md](docs/OUTPUTS.md)。
+详细说明见 [docs/输出.md](docs/输出.md)。
 
 如果你关心字段能力边界，例如 `OS`、`应用服务`、`版本`、`是否在线` 到底是否属于当前最终交付范围，见 [docs/fscanx字段支持情况说明.md](docs/fscanx字段支持情况说明.md)。
 

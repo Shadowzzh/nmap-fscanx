@@ -148,6 +148,8 @@ nmap-fscanx start \
 nmap-fscanx attach --session 'nmap-fscanx-scan-20260424'
 ```
 
+如果没有显式传 `--session`，直接使用 `start` 输出里的 `SESSION_NAME` 或 `ATTACH_COMMAND`。
+
 如果你想直接用原生 `tmux`：
 
 ```bash
@@ -387,6 +389,6 @@ cat ./scans/onsite-20260424/phase1/result.txt
 ## 15. 建议搭配阅读
 
 - [fscanx字段支持情况说明](./fscanx字段支持情况说明.md)
-- [QUICKSTART.md](./QUICKSTART.md)
-- [OUTPUTS.md](./OUTPUTS.md)
-- [INSTALL.md](./INSTALL.md)
+- [快速开始.md](./快速开始.md)
+- [输出.md](./输出.md)
+- [安装.md](./安装.md)

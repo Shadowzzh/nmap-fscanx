@@ -40,7 +40,7 @@ print_help() {
 示例：
   nmap-fscanx run --targets '192.168.1.0/24,192.168.20.0/24'
   nmap-fscanx start --targets '192.168.1.0/24,192.168.20.0/24'
-  nmap-fscanx attach --session nmap-fscanx-scan-20260424
+  nmap-fscanx attach --session '<SESSION_NAME>'
 EOF
 }
 
