@@ -23,6 +23,19 @@ assert_contains() {
   fi
 }
 
+assert_equals() {
+  local expected="$1"
+  local actual="$2"
+  local context="$3"
+
+  if [[ "$expected" != "$actual" ]]; then
+    echo "$context" >&2
+    echo "expected: $expected" >&2
+    echo "actual:   $actual" >&2
+    exit 1
+  fi
+}
+
 MOCK_BIN="$TMP_ROOT/bin"
 SCAN_ROOT="$TMP_ROOT/scans/fscanx-demo"
 mkdir -p "$MOCK_BIN"
@@ -99,6 +112,10 @@ if [[ "$mode" == "phase2" ]]; then
 {"type":"Port","text":"open\t192.168.1.10:443\t\n"},
 {"type":"Port","text":"open\t192.168.20.15:22\t\n"},
 {"type":"Port","text":"open\t192.168.20.15:445\t\n"},
+{"type":"Product","text":"http://192.168.1.10\t200\t(Portal)\t[nginx]\t\r\n"},
+{"type":"Product","text":"https://192.168.1.10\t200\t(None)\t[Cert:CN=portal.example,Issuser=N=Portal CA]\t\r\n"},
+{"type":"Product","text":"https://192.168.1.10/login.php\t200\t(Login)\t[nginx], [harbor], [Cert:CN=portal.example,Issuser=N=Portal CA], [From:https://192.168.1.10]\t\r\n"},
+{"type":"OsInfo","text":"192.168.20.15\t(Windows 10.0.19041) [WORKGROUP]"},
 JSON
   exit 0
 fi
@@ -159,6 +176,7 @@ assert_contains "PHASE_DONE=phase2" "$TMP_ROOT/pipeline.stdout"
 assert_contains "PHASE2_SUMMARY=$SCAN_ROOT/phase2/phase2.summary.json" "$TMP_ROOT/pipeline.stdout"
 assert_contains "OPEN_IP_PORT_COUNT=4" "$TMP_ROOT/pipeline.stdout"
 assert_contains "OPEN_IP_PORT_FILE=$SCAN_ROOT/phase2/open_ip_port.txt" "$TMP_ROOT/pipeline.stdout"
+assert_contains "ASSETS_CSV_FILE=$SCAN_ROOT/phase2/assets.csv" "$TMP_ROOT/pipeline.stdout"
 assert_contains "FINAL_REPORT=$SCAN_ROOT/report.json" "$TMP_ROOT/pipeline.stdout"
 
 if [[ ! -f "$SCAN_ROOT/phase1/alive_ips.txt" ]]; then
@@ -171,6 +189,11 @@ if [[ ! -f "$SCAN_ROOT/phase2/open_ip_port.txt" ]]; then
   exit 1
 fi
 
+if [[ ! -f "$SCAN_ROOT/phase2/assets.csv" ]]; then
+  echo "assets.csv was not created" >&2
+  exit 1
+fi
+
 if ! diff -u <(printf '192.168.1.10\n192.168.20.15\n') "$SCAN_ROOT/phase1/alive_ips.txt" >/dev/null; then
   echo "unexpected alive_ips.txt content" >&2
   exit 1
@@ -178,6 +201,20 @@ fi
 
 if ! diff -u <(printf '192.168.1.10:80\n192.168.1.10:443\n192.168.20.15:22\n192.168.20.15:445\n') "$SCAN_ROOT/phase2/open_ip_port.txt" >/dev/null; then
   echo "unexpected open_ip_port.txt content" >&2
+  exit 1
+fi
+
+assets_csv_header="$(head -n 1 "$SCAN_ROOT/phase2/assets.csv" | tr -d '\r')"
+assert_equals '"ip","port","os_hint","urls","titles","fingerprints","cert_info"' "$assets_csv_header" "unexpected assets.csv header"
+
+if ! diff -u <(printf '%s\n' \
+  '"ip","port","os_hint","urls","titles","fingerprints","cert_info"' \
+  '"192.168.1.10","80","","[""http://192.168.1.10""]","[""(Portal)""]","[""nginx""]","[]"' \
+  '"192.168.1.10","443","","[""https://192.168.1.10"",""https://192.168.1.10/login.php""]","[""(Login)""]","[""harbor"",""nginx""]","[""Cert:CN=portal.example,Issuser=N=Portal CA""]"' \
+  '"192.168.20.15","22","(Windows 10.0.19041) [WORKGROUP]","[]","[]","[]","[]"' \
+  '"192.168.20.15","445","(Windows 10.0.19041) [WORKGROUP]","[]","[]","[]","[]"') "$SCAN_ROOT/phase2/assets.csv" >/dev/null; then
+  echo "unexpected assets.csv content" >&2
+  cat "$SCAN_ROOT/phase2/assets.csv" >&2
   exit 1
 fi
 
@@ -194,6 +231,18 @@ if [[ ! -f "$SCAN_ROOT/report.json" ]]; then
   exit 1
 fi
 
+if jq -e '.alive_ips' "$SCAN_ROOT/phase1/phase1.summary.json" >/dev/null 2>&1; then
+  echo "phase1.summary.json should not embed alive_ips" >&2
+  cat "$SCAN_ROOT/phase1/phase1.summary.json" >&2
+  exit 1
+fi
+
+if jq -e '.assets' "$SCAN_ROOT/phase2/phase2.summary.json" >/dev/null 2>&1; then
+  echo "phase2.summary.json should not embed assets" >&2
+  cat "$SCAN_ROOT/phase2/phase2.summary.json" >&2
+  exit 1
+fi
+
 alive_count="$(jq -r '.phase1.alive_ip_count' "$SCAN_ROOT/report.json")"
 if [[ "$alive_count" != "2" ]]; then
   echo "unexpected alive_ip_count: $alive_count" >&2
@@ -206,9 +255,9 @@ if [[ "$asset_count" != "4" ]]; then
   exit 1
 fi
 
-assets_json="$(jq -c '.assets' "$SCAN_ROOT/report.json")"
-if [[ "$assets_json" != '["192.168.1.10:80","192.168.1.10:443","192.168.20.15:22","192.168.20.15:445"]' ]]; then
-  echo "unexpected assets list: $assets_json" >&2
+if jq -e '.assets' "$SCAN_ROOT/report.json" >/dev/null 2>&1; then
+  echo "report.json should not embed assets" >&2
+  cat "$SCAN_ROOT/report.json" >&2
   exit 1
 fi
 

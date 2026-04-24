@@ -52,7 +52,8 @@ print_help() {
   5. 进入 phase2 目录，用 -hf ../phase1/alive_ips.txt 扫描全部端口。
   6. 将 phase2/result.txt 归一化为标准 JSON 数组。
   7. 只提取 type=Port 的记录，从中去重得到 phase2/open_ip_port.txt。
-  8. 汇总 phase1 和 phase2 的统计信息，生成最终 report.json。
+  8. 基于 Port、Product、OsInfo 生成 phase2/assets.csv。
+  9. 汇总 phase1 和 phase2 的统计信息，生成最终 report.json。
 
 输出文件：
   <scan-root>/input.json
@@ -65,6 +66,7 @@ print_help() {
   <scan-root>/phase2/result.txt
   <scan-root>/phase2/normalized.json
   <scan-root>/phase2/open_ip_port.txt
+  <scan-root>/phase2/assets.csv
   <scan-root>/phase2/phase2.summary.json
   <scan-root>/report.json
 
@@ -135,11 +137,6 @@ ensure_scan_root() {
 
 targets_json() {
   printf '%s' "$TARGETS" | jq -Rsc 'if . == "" then [] else split(",") | map(select(length > 0)) end'
-}
-
-text_file_to_json_array() {
-  local file="$1"
-  jq -Rsc 'split("\n") | map(select(length > 0))' "$file"
 }
 
 count_lines() {
@@ -275,6 +272,105 @@ extract_open_ip_ports() {
   ' "$normalized_file" | awk 'NF && !seen[$0]++' > "$output_file"
 }
 
+write_phase2_assets_csv() {
+  local normalized_file="$1"
+  local csv_file="$2"
+
+  jq -r '
+    def trim_space:
+      sub("^[[:space:]]+"; "")
+      | sub("[[:space:]]+$"; "");
+
+    def clean_text:
+      gsub("\r"; "")
+      | gsub("\n"; "");
+
+    def unique_strings:
+      map(select(type == "string" and length > 0))
+      | unique;
+
+    def parse_port_record:
+      try (.text | capture("open\\t(?<ip>[0-9.]+):(?<port>[0-9]+)")) catch empty;
+
+    def parse_os_record:
+      try (
+        .text
+        | clean_text
+        | capture("^(?<ip>[0-9.]+)\\t(?<hint>.*)$")
+        | .hint |= trim_space
+      ) catch empty;
+
+    def parse_product_record:
+      try (
+        (.text | clean_text | split("\t")) as $fields
+        | ($fields[0] // "") as $url
+        | ($fields[2] // "") as $title
+        | ($fields[3] // "") as $evidence
+        | ($url | capture("^(?<scheme>https?)://(?<ip>[0-9.]+)(?::(?<port>[0-9]+))?(?<path>/.*)?$")) as $parsed_url
+        | ($evidence | [match("\\[[^\\]]+\\]"; "g").string | .[1:-1] | trim_space]) as $items
+        | {
+            ip: $parsed_url.ip,
+            port: ($parsed_url.port // (if $parsed_url.scheme == "https" then "443" else "80" end)),
+            url: $url,
+            title: (
+              if $title == "" or $title == "(None)" then ""
+              else $title
+              end
+            ),
+            fingerprints: (
+              $items
+              | map(select(startswith("Cert:") | not))
+              | map(select(startswith("From:") | not))
+              | unique_strings
+            ),
+            cert_info: (
+              $items
+              | map(select(startswith("Cert:")))
+              | unique_strings
+            )
+          }
+      ) catch empty;
+
+    ([
+      .[]
+      | select(.type == "Port")
+      | parse_port_record
+    ] | unique_by(.ip + ":" + .port) | sort_by(.ip, (.port | tonumber))) as $rows
+    |
+    (reduce (
+      [
+        .[]
+        | select(.type == "OsInfo")
+        | parse_os_record
+      ][]
+    ) as $entry ({}; .[$entry.ip] = ((.[$entry.ip] // []) + [$entry.hint]))) as $os_map
+    |
+    ([
+      .[]
+      | select(.type == "Product")
+      | parse_product_record
+    ]) as $products
+    |
+    ([
+      ["ip", "port", "os_hint", "urls", "titles", "fingerprints", "cert_info"]
+    ] + [
+      $rows[] as $row
+      | ($products | map(select(.ip == $row.ip and .port == $row.port))) as $product_matches
+      | [
+          $row.ip,
+          $row.port,
+          (($os_map[$row.ip] // []) | unique_strings | join(" | ")),
+          ($product_matches | map(.url) | unique_strings | tojson),
+          ($product_matches | map(.title) | unique_strings | tojson),
+          ([ $product_matches[]?.fingerprints[]? ] | unique_strings | tojson),
+          ([ $product_matches[]?.cert_info[]? ] | unique_strings | tojson)
+        ]
+    ])
+    | .[]
+    | @csv
+  ' "$normalized_file" > "$csv_file"
+}
+
 run_scanner_in_dir() {
   local workdir="$1"
   shift
@@ -295,12 +391,15 @@ run_scanner_in_dir() {
 write_phase1_summary() {
   local summary_file="$1"
   local alive_file="$2"
+  local alive_count=""
+
+  alive_count="$(count_lines "$alive_file")"
 
   jq -n \
     --arg generated_at "$(timestamp_now)" \
     --arg scanner "$SCANNER" \
     --argjson targets "$(targets_json)" \
-    --argjson alive_ips "$(text_file_to_json_array "$alive_file")" \
+    --argjson alive_ip_count "$alive_count" \
     --arg phase1_ports "$PHASE1_PORTS" \
     '{
       generated_at: $generated_at,
@@ -308,8 +407,7 @@ write_phase1_summary() {
       scanner: $scanner,
       targets: $targets,
       ports: ($phase1_ports | split(",") | map(tonumber)),
-      alive_ip_count: ($alive_ips | length),
-      alive_ips: $alive_ips,
+      alive_ip_count: $alive_ip_count,
       alive_ips_file: "phase1/alive_ips.txt"
     }' > "$summary_file"
 }
@@ -317,20 +415,25 @@ write_phase1_summary() {
 write_phase2_summary() {
   local summary_file="$1"
   local assets_file="$2"
+  local assets_csv_file="$3"
+  local asset_count=""
+
+  asset_count="$(count_lines "$assets_file")"
 
   jq -n \
     --arg generated_at "$(timestamp_now)" \
     --arg scanner "$SCANNER" \
-    --argjson assets "$(text_file_to_json_array "$assets_file")" \
+    --argjson open_ip_port_count "$asset_count" \
     --arg phase2_ports "$PHASE2_PORTS" \
+    --arg assets_csv_file "$assets_csv_file" \
     '{
       generated_at: $generated_at,
       phase: "phase2",
       scanner: $scanner,
       port_range: $phase2_ports,
-      open_ip_port_count: ($assets | length),
-      assets: $assets,
-      open_ip_port_file: "phase2/open_ip_port.txt"
+      open_ip_port_count: $open_ip_port_count,
+      open_ip_port_file: "phase2/open_ip_port.txt",
+      assets_csv_file: $assets_csv_file
     }' > "$summary_file"
 }
 
@@ -355,9 +458,9 @@ write_report() {
       phase2: {
         port_range: $phase2[0].port_range,
         open_ip_port_count: $phase2[0].open_ip_port_count,
-        open_ip_port_file: $phase2[0].open_ip_port_file
-      },
-      assets: $phase2[0].assets
+        open_ip_port_file: $phase2[0].open_ip_port_file,
+        assets_csv_file: $phase2[0].assets_csv_file
+      }
     }' > "$report_file"
 }
 
@@ -387,6 +490,7 @@ print_phase1_output() {
 print_phase2_output() {
   local summary_file="$1"
   local assets_file="$2"
+  local assets_csv_file="$3"
   local asset_count=""
 
   asset_count="$(count_lines "$assets_file")"
@@ -394,6 +498,7 @@ print_phase2_output() {
   echo "PHASE2_SUMMARY=$summary_file"
   echo "OPEN_IP_PORT_COUNT=$asset_count"
   echo "OPEN_IP_PORT_FILE=$assets_file"
+  echo "ASSETS_CSV_FILE=$assets_csv_file"
 }
 
 run_phase1() {
@@ -430,6 +535,7 @@ run_phase2() {
   local alive_file="$phase1_dir/alive_ips.txt"
   local normalized_file="$phase2_dir/normalized.json"
   local assets_file="$phase2_dir/open_ip_port.txt"
+  local assets_csv_file="$phase2_dir/assets.csv"
   local summary_file="$phase2_dir/phase2.summary.json"
 
   if [[ ! -f "$alive_file" ]]; then
@@ -442,11 +548,12 @@ run_phase2() {
   if [[ ! -s "$alive_file" ]]; then
     : > "$assets_file"
     printf '[]\n' > "$normalized_file"
+    write_phase2_assets_csv "$normalized_file" "$assets_csv_file"
     printf 'phase1 没有存活 IP，跳过 phase2 扫描\n' | tee "$phase2_dir/console.log"
-    write_phase2_summary "$summary_file" "$assets_file"
+    write_phase2_summary "$summary_file" "$assets_file" "phase2/assets.csv"
     write_report "$phase1_dir/phase1.summary.json" "$summary_file" "$SCAN_ROOT/report.json"
     print_phase_done "phase2"
-    print_phase2_output "$summary_file" "$assets_file"
+    print_phase2_output "$summary_file" "$assets_file" "$assets_csv_file"
     return 0
   fi
 
@@ -461,10 +568,11 @@ run_phase2() {
 
   normalize_result_file "$phase2_dir/result.txt" "$normalized_file"
   extract_open_ip_ports "$normalized_file" "$assets_file"
-  write_phase2_summary "$summary_file" "$assets_file"
+  write_phase2_assets_csv "$normalized_file" "$assets_csv_file"
+  write_phase2_summary "$summary_file" "$assets_file" "phase2/assets.csv"
   write_report "$phase1_dir/phase1.summary.json" "$summary_file" "$SCAN_ROOT/report.json"
   print_phase_done "phase2"
-  print_phase2_output "$summary_file" "$assets_file"
+  print_phase2_output "$summary_file" "$assets_file" "$assets_csv_file"
 }
 
 parse_args() {
